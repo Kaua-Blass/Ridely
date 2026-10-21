@@ -27,15 +27,16 @@ CREATE TABLE usuario (
   id serial PRIMARY KEY, associado_id int UNIQUE REFERENCES associado,
   nome text NOT NULL, email text NOT NULL UNIQUE, senha_hash text NOT NULL,
   perfil perfil_acesso NOT NULL DEFAULT 'associado', ativo boolean NOT NULL DEFAULT true,
-  telefone text, endereco text, contato_emergencia text, foto_path text, ultimo_acesso timestamptz);
+  telefone text, endereco text, contato_emergencia text, foto_path text, ultimo_acesso timestamptz,
+  email_verificado_em timestamptz, senha_alterada_em timestamptz NOT NULL DEFAULT now());
 CREATE TABLE token_usuario ( -- convite, validação de e-mail e recuperação de senha
   id serial PRIMARY KEY, tipo text NOT NULL CHECK (tipo IN ('convite','email','senha')),
   associado_id int REFERENCES associado, usuario_id int REFERENCES usuario,
-  token_hash text NOT NULL, expira_em timestamptz NOT NULL, usado_em timestamptz);
+  token_hash text NOT NULL, expira_em timestamptz NOT NULL, usado_em timestamptz, dados jsonb);
 CREATE TABLE solicitacao (
   id serial PRIMARY KEY, tipo text NOT NULL CHECK (tipo IN ('associacao','alteracao_contrato')),
   dados jsonb NOT NULL, status text NOT NULL DEFAULT 'pendente' CHECK (status IN ('pendente','aprovada','rejeitada')),
-  decidido_por int REFERENCES usuario, criado_em timestamptz NOT NULL DEFAULT now());
+  usuario_id int REFERENCES usuario, decidido_por int REFERENCES usuario, criado_em timestamptz NOT NULL DEFAULT now());
 CREATE TABLE parametro (chave text PRIMARY KEY, valor text NOT NULL);
 INSERT INTO parametro VALUES ('valor_por_dia','50.00'), ('multa_percentual','5');
 
@@ -93,3 +94,8 @@ CREATE FUNCTION bloquear_alteracao() RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN RAISE EXCEPTION 'Registro imutável: use estorno'; END $$;
 CREATE TRIGGER mov_imutavel BEFORE UPDATE OR DELETE ON movimentacao FOR EACH ROW EXECUTE FUNCTION bloquear_alteracao();
 CREATE TRIGGER aud_imutavel BEFORE UPDATE OR DELETE ON auditoria FOR EACH ROW EXECUTE FUNCTION bloquear_alteracao();
+
+-- e-mails sempre em minúsculas e busca rápida de tokens
+ALTER TABLE usuario ADD CONSTRAINT usuario_email_minusculo CHECK (email = lower(email));
+ALTER TABLE associado ADD CONSTRAINT associado_email_minusculo CHECK (email IS NULL OR email = lower(email));
+CREATE INDEX token_usuario_hash ON token_usuario (token_hash);

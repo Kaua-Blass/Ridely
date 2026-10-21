@@ -1,12 +1,12 @@
-import { ReactNode } from 'react';
+import { Outlet } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import styles from './Layout.module.css';
 
-export default function Layout({ children }: { children: ReactNode }) {
+export default function Layout() {
   return (
     <div className={styles.app}>
       <Sidebar />
-      <main className={styles.conteudo}>{children}</main>
+      <main className={styles.conteudo}><Outlet /></main>
     </div>
   );
 }

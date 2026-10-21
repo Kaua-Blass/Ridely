@@ -15,7 +15,7 @@ export default function Sidebar() {
   if (!usuario) return null;
   return (
     <aside className={styles.menu}>
-      <div className={styles.logo}>TCC · Transporte Escolar</div>
+      <div className={styles.logo}>Ridely</div>
       <nav>
         {ACESSO[usuario.perfil].map((t) => (
           <NavLink key={t} to={ITENS[t][0]} className={({ isActive }) => (isActive ? styles.ativo : '')}>{ITENS[t][1]}</NavLink>

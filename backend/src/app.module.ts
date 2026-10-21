@@ -1,4 +1,9 @@
 import { Module } from '@nestjs/common';
+import { APP_GUARD } from '@nestjs/core';
+import { JwtModule } from '@nestjs/jwt';
+import { AuthGuard } from './common/auth.guard';
+import { CommonModule } from './common/common.module';
+import { RolesGuard } from './common/roles.guard';
 import { AuthModule } from './modules/auth/auth.module';
 import { PerfilModule } from './modules/perfil/perfil.module';
 import { PainelModule } from './modules/painel/painel.module';
@@ -12,5 +17,26 @@ import { ComunicacaoModule } from './modules/comunicacao/comunicacao.module';
 import { RelatoriosModule } from './modules/relatorios/relatorios.module';
 import { AdministracaoModule } from './modules/administracao/administracao.module';
 
-@Module({ imports: [AuthModule, PerfilModule, PainelModule, AssociadosModule, VeiculosRotasModule, FinanceiroModule, ControlesFinanceirosModule, ContratosModule, TransporteModule, ComunicacaoModule, RelatoriosModule, AdministracaoModule] })
+@Module({
+  imports: [
+    JwtModule.register({ global: true, secret: process.env.JWT_SECRET, signOptions: { expiresIn: '8h' } }),
+    CommonModule,
+    AuthModule,
+    PerfilModule,
+    PainelModule,
+    AssociadosModule,
+    VeiculosRotasModule,
+    FinanceiroModule,
+    ControlesFinanceirosModule,
+    ContratosModule,
+    TransporteModule,
+    ComunicacaoModule,
+    RelatoriosModule,
+    AdministracaoModule,
+  ],
+  providers: [
+    { provide: APP_GUARD, useClass: AuthGuard },  // 1º: identifica o usuário pelo cookie
+    { provide: APP_GUARD, useClass: RolesGuard }, // 2º: confere o perfil exigido pela rota
+  ],
+})
 export class AppModule {}

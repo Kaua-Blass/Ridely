@@ -1,4 +1,2 @@
-import { api } from '../../lib/api';
-
-// TODO: chamadas de Entrar à API (/auth).
-export const listar = () => api<unknown[]>('/auth');
+// O login usa useAuth().entrar (lib/auth.tsx), que chama POST /auth/login.
+export {};
