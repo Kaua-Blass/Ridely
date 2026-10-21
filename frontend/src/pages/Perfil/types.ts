@@ -1,2 +1,1 @@
-// TODO: tipos da tela Meu perfil.
-export {};
+export type { PerfilCompleto } from './api';

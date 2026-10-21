@@ -17,12 +17,16 @@ const MSG_ESQUECI = 'Se esse e-mail estiver cadastrado, enviamos um link para re
 export class AuthService {
   constructor(private readonly db: DbService, private readonly jwt: JwtService, private readonly mail: MailService) {}
 
-  async login(email: string, senha: string, res: Response) {
+  async login(email: string, senha: string, res: Response, ip?: string) {
     const u = await this.db.um('select * from usuario where email=$1', [email.toLowerCase().trim()]);
     const confere = await conferirSenha(senha, u?.senha_hash ?? HASH_FALSO); // sempre calcula, existindo ou não
-    if (!u || !confere) throw new UnauthorizedException('E-mail ou senha inválidos.');
+    if (!u || !confere) {
+      await this.db.auditar(u?.id ?? null, 'login_falhou', 'usuario', { email: email.toLowerCase().trim(), ip });
+      throw new UnauthorizedException('E-mail ou senha inválidos.');
+    }
     if (!u.ativo) throw new ForbiddenException('Seu acesso ainda não foi liberado. Aguarde a aprovação da presidência.');
     await this.db.query('update usuario set ultimo_acesso=now() where id=$1', [u.id]);
+    await this.db.auditar(u.id, 'login', 'usuario', { ip });
     res.cookie(COOKIE, await this.jwt.signAsync({ sub: u.id }), opcoesCookie());
     return usuarioPublico(u);
   }
@@ -61,16 +65,28 @@ export class AuthService {
     return resposta;
   }
 
+  /** Confirma o e-mail do cadastro ou o novo e-mail pedido em Meu perfil. */
   async verificarEmail(token: string) {
-    const ok = await this.db.tx(async (c) => {
-      const t = (await c.query("select id, usuario_id from token_usuario where tipo='email' and token_hash=$1 and usado_em is null and expira_em>now() for update", [hashToken(token)])).rows[0];
-      if (!t) return false;
-      await c.query('update usuario set email_verificado_em=now() where id=$1', [t.usuario_id]);
-      await c.query('update token_usuario set usado_em=now() where id=$1', [t.id]);
-      return true;
-    });
-    if (!ok) throw new BadRequestException('Link inválido ou expirado.');
-    return { mensagem: 'E-mail confirmado. Agora é só aguardar a aprovação da presidência.' };
+    let mensagem: string | null = null;
+    let uid = 0;
+    try {
+      mensagem = await this.db.tx(async (c) => {
+        const t = (await c.query("select id, tipo, usuario_id, dados from token_usuario where tipo in ('email','email_novo') and token_hash=$1 and usado_em is null and expira_em>now() for update", [hashToken(token)])).rows[0];
+        if (!t) return null;
+        uid = t.usuario_id;
+        if (t.tipo === 'email') {
+          await c.query('update usuario set email_verificado_em=now() where id=$1', [t.usuario_id]);
+        } else {
+          const u = (await c.query('update usuario set email=$2, email_verificado_em=now() where id=$1 returning associado_id', [t.usuario_id, t.dados.email])).rows[0];
+          if (u.associado_id) await c.query('update associado set email=$2 where id=$1', [u.associado_id, t.dados.email]);
+        }
+        await c.query('update token_usuario set usado_em=now() where id=$1', [t.id]);
+        return t.tipo === 'email' ? 'E-mail confirmado. Se o cadastro ainda não foi aprovado, a presidência já pode analisá-lo.' : 'Novo e-mail confirmado. Use-o no próximo login.';
+      });
+    } catch (e) { tratarUnico(e, 'Esse e-mail já está em uso por outra conta.'); }
+    if (!mensagem) throw new BadRequestException('Link inválido ou expirado.');
+    await this.db.auditar(uid, 'email_confirmado', 'usuario');
+    return { mensagem };
   }
 
   /** Sempre devolve a mesma resposta, exista a conta ou não. */

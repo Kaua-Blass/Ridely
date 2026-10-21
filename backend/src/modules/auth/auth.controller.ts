@@ -16,7 +16,7 @@ export class AuthController {
   @Publico() @Post('login') @HttpCode(200)
   login(@Body() d: LoginDto, @Req() req: ReqAuth, @Res({ passthrough: true }) res: Response) {
     this.limite.verificar(`login|${req.ip}|${d.email.toLowerCase()}`, 8, QUINZE_MIN);
-    return this.service.login(d.email, d.senha, res);
+    return this.service.login(d.email, d.senha, res, req.ip);
   }
   @Publico() @Post('logout') @HttpCode(200)
   logout(@Res({ passthrough: true }) res: Response) { return this.service.logout(res); }

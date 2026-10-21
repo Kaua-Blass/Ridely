@@ -11,6 +11,9 @@ export class VeiculosRotasController {
   @Publico() @Get('instituicoes')
   instituicoes() { return this.service.instituicoes(); }
 
+  @Get('rotas')
+  rotas() { return this.service.rotas(); }
+
   @Get()
   listar() { return this.service.listar(); }
 }

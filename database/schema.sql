@@ -30,7 +30,7 @@ CREATE TABLE usuario (
   telefone text, endereco text, contato_emergencia text, foto_path text, ultimo_acesso timestamptz,
   email_verificado_em timestamptz, senha_alterada_em timestamptz NOT NULL DEFAULT now());
 CREATE TABLE token_usuario ( -- convite, validação de e-mail e recuperação de senha
-  id serial PRIMARY KEY, tipo text NOT NULL CHECK (tipo IN ('convite','email','senha')),
+  id serial PRIMARY KEY, tipo text NOT NULL CHECK (tipo IN ('convite','email','email_novo','senha')),
   associado_id int REFERENCES associado, usuario_id int REFERENCES usuario,
   token_hash text NOT NULL, expira_em timestamptz NOT NULL, usado_em timestamptz, dados jsonb);
 CREATE TABLE solicitacao (
@@ -99,3 +99,4 @@ CREATE TRIGGER aud_imutavel BEFORE UPDATE OR DELETE ON auditoria FOR EACH ROW EX
 ALTER TABLE usuario ADD CONSTRAINT usuario_email_minusculo CHECK (email = lower(email));
 ALTER TABLE associado ADD CONSTRAINT associado_email_minusculo CHECK (email IS NULL OR email = lower(email));
 CREATE INDEX token_usuario_hash ON token_usuario (token_hash);
+CREATE INDEX auditoria_em ON auditoria (em DESC);

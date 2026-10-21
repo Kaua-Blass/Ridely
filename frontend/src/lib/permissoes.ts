@@ -30,3 +30,5 @@ export const CARGO_PARA_PERFIL: Record<string, Perfil> = {
   Associado: 'associado', Presidente: 'presidente', 'Vice-presidente': 'vice-presidente',
   Tesoureiro: 'tesoureiro', Conselheiro: 'conselheiro', Auxiliar: 'auxiliar',
 };
+
+export const PERFIS: Perfil[] = ['presidente', 'vice-presidente', 'tesoureiro', 'conselheiro', 'auxiliar', 'associado', 'motorista'];

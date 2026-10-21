@@ -1,18 +1,16 @@
-import { ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import type { PoolClient } from 'pg';
 import { DbService } from '../../common/db.service';
 import { tratarUnico } from '../../common/erros';
 import { MailService } from '../../common/mail.service';
 import { hashToken, novoToken } from '../../common/password';
-import { paraBanco } from '../../common/perfil.enum';
+import { paraBanco, perfilApi, rotuloCargo } from '../../common/perfil.enum';
 import type { UsuarioPublico } from '../../common/usuario';
 import { ConviteDto } from './dto/convite.dto';
+import { EditarAssociadoDto } from './dto/editar.dto';
 
-const ROTULO: Record<string, string> = {
-  associado: 'Associado', presidente: 'Presidente', vice_presidente: 'Vice-presidente',
-  tesoureiro: 'Tesoureiro', conselheiro: 'Conselheiro', auxiliar: 'Auxiliar',
-};
 const link = (token: string) => `${process.env.APP_URL ?? 'http://localhost:5173'}/concluir-cadastro?token=${token}`;
+const ADMIN = 'Só a presidência altera cargos e dados de quem tem cargo ou perfil administrativo.';
 
 @Injectable()
 export class AssociadosService {
@@ -20,12 +18,13 @@ export class AssociadosService {
 
   async listar() {
     const l = await this.db.query(`
-      select a.id, a.nome, a.email, a.telefone, a.cargo, a.situacao, i.nome as instituicao, r.nome as rota
+      select a.id, a.nome, a.email, a.telefone, a.cargo, a.situacao, a.ponto_embarque as "pontoEmbarque",
+             a.instituicao_id as "instituicaoId", a.rota_id as "rotaId", i.nome as instituicao, r.nome as rota
       from associado a
       left join instituicao i on i.id = a.instituicao_id
       left join rota r on r.id = a.rota_id
       order by a.nome`);
-    return l.map((a) => ({ ...a, cargo: ROTULO[a.cargo] ?? a.cargo }));
+    return l.map((a) => ({ ...a, cargoCodigo: perfilApi(a.cargo), cargo: rotuloCargo(a.cargo) }));
   }
 
   private async novoConvite(c: PoolClient, associadoId: number, perfil: string) {
@@ -68,5 +67,54 @@ export class AssociadosService {
     const token = await this.db.tx((c) => this.novoConvite(c, id, perfil));
     void this.enviarConvite(a.nome, a.email, token);
     return { mensagem: `Convite reenviado para ${a.email}.` };
+  }
+
+  /** Edita os dados do associado. Quem tem cargo ou perfil administrativo só a presidência altera. */
+  async editar(id: number, d: EditarAssociadoDto, quem: UsuarioPublico) {
+    const a = await this.db.um('select a.*, u.perfil from associado a left join usuario u on u.associado_id = a.id where a.id=$1', [id]);
+    if (!a) throw new NotFoundException('Associado não encontrado.');
+    const cargo = paraBanco(d.cargo);
+    const administrativo = a.cargo !== 'associado' || cargo !== 'associado' || (a.perfil && a.perfil !== 'associado');
+    if (administrativo && quem.perfil !== 'presidente') throw new ForbiddenException(ADMIN);
+
+    let rotaId = d.rotaId ?? null;
+    if (rotaId == null) {
+      rotaId = (await this.db.um('select rota_id from rota_instituicao where instituicao_id=$1 order by rota_id limit 1', [d.instituicaoId]))?.rota_id ?? null;
+    } else if (!(await this.db.um('select 1 from rota_instituicao where rota_id=$1 and instituicao_id=$2', [rotaId, d.instituicaoId]))) {
+      throw new BadRequestException('Essa rota não atende a instituição escolhida.');
+    }
+    const ponto = d.pontoEmbarque?.trim() || null;
+    if (ponto && !(await this.db.um('select 1 from rota_parada where rota_id=$1 and nome=$2', [rotaId, ponto]))) {
+      throw new BadRequestException('Esse ponto de embarque não pertence à rota escolhida.');
+    }
+    const cpf = d.cpf?.replace(/\D/g, '') || null; // vazio = mantém o CPF atual
+    try {
+      await this.db.tx(async (c) => {
+        await c.query(`update associado set nome=$2, telefone=$3, cpf=coalesce($4, cpf), cargo=$5, instituicao_id=$6, rota_id=$7, ponto_embarque=$8 where id=$1`,
+          [id, d.nome.trim(), d.telefone?.trim() || null, cpf, cargo, d.instituicaoId, rotaId, ponto]);
+        await c.query('update usuario set nome=$2 where associado_id=$1', [id, d.nome.trim()]);
+      });
+    } catch (e) { tratarUnico(e, 'Esse CPF já está cadastrado em outro associado.'); }
+    await this.db.auditar(quem.id, 'associado_editado', 'associado', { id, cargoAntes: a.cargo, cargoDepois: cargo });
+    return { mensagem: 'Associado atualizado.' };
+  }
+
+  /** Inativar bloqueia o acesso na hora (as sessões abertas caem); reativar devolve o acesso. */
+  async situacao(id: number, ativo: boolean, quem: UsuarioPublico) {
+    const a = await this.db.um('select a.*, u.id as uid, u.perfil from associado a left join usuario u on u.associado_id = a.id where a.id=$1', [id]);
+    if (!a) throw new NotFoundException('Associado não encontrado.');
+    if (a.situacao === 'convite') throw new BadRequestException('Convite pendente: reenvie o convite ou aguarde a conclusão do cadastro.');
+    if ((a.cargo !== 'associado' || (a.perfil && a.perfil !== 'associado')) && quem.perfil !== 'presidente') throw new ForbiddenException(ADMIN);
+    if (!ativo && a.uid === quem.id) throw new BadRequestException('Você não pode inativar a si mesmo.');
+    if (!ativo && a.perfil === 'presidente') {
+      const outros = await this.db.um("select count(*)::int as n from usuario where perfil='presidente' and ativo and id<>$1", [a.uid]);
+      if (!outros || outros.n < 1) throw new BadRequestException('Mantenha pelo menos um presidente ativo.');
+    }
+    await this.db.tx(async (c) => {
+      await c.query('update associado set situacao=$2 where id=$1', [id, ativo ? 'ativo' : 'inativo']);
+      if (a.uid) await c.query('update usuario set ativo=$2 where id=$1', [a.uid, ativo]);
+    });
+    await this.db.auditar(quem.id, ativo ? 'associado_reativado' : 'associado_inativado', 'associado', { id });
+    return { mensagem: ativo ? 'Associado reativado.' : 'Associado inativado. O acesso foi bloqueado.' };
   }
 }

@@ -1,6 +1,7 @@
 import { NavLink } from 'react-router-dom';
 import { useAuth } from '../../lib/auth';
 import { ACESSO } from '../../lib/permissoes';
+import Avatar from '../Avatar/Avatar';
 import styles from './Sidebar.module.css';
 
 const ITENS: Record<string, [string, string]> = {
@@ -11,7 +12,7 @@ const ITENS: Record<string, [string, string]> = {
 };
 
 export default function Sidebar() {
-  const { usuario, sair } = useAuth();
+  const { usuario, sair, fotoV } = useAuth();
   if (!usuario) return null;
   return (
     <aside className={styles.menu}>
@@ -22,7 +23,7 @@ export default function Sidebar() {
         ))}
       </nav>
       <div className={styles.rodape}>
-        <b>{usuario.nome}</b>
+        <div className={styles.eu}><Avatar nome={usuario.nome} temFoto={usuario.temFoto} versao={fotoV} /><b>{usuario.nome}</b></div>
         <span>Perfil: {usuario.perfil}</span>
         <button onClick={sair}>Sair</button>
       </div>

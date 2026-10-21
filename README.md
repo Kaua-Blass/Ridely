@@ -77,6 +77,27 @@ Tokens de e-mail (confirmação, convite, recuperação) são aleatórios, guard
 | `POST /api/associados/convite`, `/:id/reenviar-convite` | presidente, vice (só o presidente define perfis administrativos) |
 | `GET /api/administracao/solicitacoes`, `POST .../:id/decisao` | presidente |
 
+## Conta e administração (etapa 1)
+
+| Recurso | Como funciona |
+|---|---|
+| Meu perfil | edita nome, telefone, endereço, contato de emergência e instituição (trocar a instituição recalcula a rota) |
+| Foto | JPG, PNG ou WebP até 2 MB; o tipo é conferido pelo conteúdo; fica em `UPLOAD_DIR/fotos` e só o dono acessa |
+| Trocar senha | pede a senha atual; as outras sessões caem e a atual continua |
+| Trocar e-mail | pede a senha atual e envia um link ao **novo** endereço; o e-mail só muda quando o link é aberto; o endereço antigo é avisado |
+| Associados | editar (rota só entre as que atendem a instituição) e inativar/reativar; inativar bloqueia o acesso na hora |
+| Usuários e perfis | o presidente muda perfil e bloqueia acessos; não altera o próprio acesso; sempre sobra um presidente ativo |
+| Parâmetros | valor por dia e multa, gravados no banco |
+| Auditoria | filtros por ação e período, paginação; logins, convites, aprovações, trocas de senha/e-mail, alterações de usuário e de parâmetros |
+
+Regra de quem pode o quê em Associados: o vice edita e inativa só associados comuns; cargo ou perfil administrativo é com o presidente.
+
+Endpoints novos: `GET/PATCH /api/perfil`, `POST /api/perfil/senha`, `/email`, `/foto` (+ `GET`/`DELETE`), `PATCH /api/associados/:id`, `POST /api/associados/:id/situacao`, `GET /api/veiculos-rotas/rotas`, e em `/api/administracao`: `usuarios`, `parametros`, `auditoria`, `auditoria/acoes`.
+
+## Atualizar um banco que já existe
+
+Quem já tinha subido o banco aplica as migrações da pasta `database/migrations` em ordem (veja o README de lá).
+
 ## Regras já decididas
 
 - Associado é o mesmo que estudante (1 para 1); o convite sugere o perfil pelo cargo e o presidente ajusta.
@@ -89,7 +110,7 @@ Tokens de e-mail (confirmação, convite, recuperação) são aleatórios, guard
 
 ## Próximos passos
 
-1. Meu perfil: editar dados, foto, instituição e trocar a senha logado.
-2. Associados: editar e inativar; Administração: usuários, perfis e auditoria.
-3. Veículos e rotas, e depois Financeiro e Contas (baixas em transação).
-4. Contratos, transporte e comunicação.
+1. Veículos e rotas: incluir, alterar e remover (inclui motoristas com acesso).
+2. Contratos, depois Financeiro e Contas (baixas em transação).
+3. Transporte, comunicação, painel e relatórios.
+4. Testes automáticos e preparação para o servidor próprio.
