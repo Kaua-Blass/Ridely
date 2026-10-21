@@ -1,0 +1,3 @@
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--fundo); color: var(--texto); font: 15px/1.5 system-ui, sans-serif; }
+button { font: inherit; cursor: pointer; }

@@ -1,0 +1,6 @@
+.menu { background: var(--painel-forte); color: #fff; padding: 20px 12px; display: flex; flex-direction: column; gap: 6px; }
+.logo { font-weight: 700; padding: 0 8px 14px; }
+nav { display: flex; flex-direction: column; gap: 2px; }
+nav a { color: #dbe7ff; text-decoration: none; padding: 8px 12px; border-radius: 9px; }
+nav a:hover, .ativo { background: rgba(255, 255, 255, .22); color: #fff; }
+.rodape { margin-top: auto; display: flex; flex-direction: column; gap: 4px; font-size: 13px; }
