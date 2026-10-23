@@ -1,2 +1,1 @@
-// TODO: tipos da tela Controles financeiros.
-export {};
+export type { Conta, Movimentacao } from './api';

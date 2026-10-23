@@ -120,17 +120,22 @@ export class AuthService {
     return { mensagem: 'Senha alterada. Entre com a nova senha.' };
   }
 
-  /** Conclusão de cadastro por convite: cria o usuário do associado já convidado. */
+  /** Conclusão de cadastro por convite: associado (cria o usuário) ou motorista (a conta já existe, sem senha). */
   async concluirCadastro(token: string, senha: string, telefone?: string) {
     const hash = await hashSenha(senha);
     try {
       await this.db.tx(async (c) => {
-        const t = (await c.query("select id, associado_id, dados from token_usuario where tipo='convite' and token_hash=$1 and usado_em is null and expira_em>now() for update", [hashToken(token)])).rows[0];
+        const t = (await c.query("select id, associado_id, usuario_id, dados from token_usuario where tipo='convite' and token_hash=$1 and usado_em is null and expira_em>now() for update", [hashToken(token)])).rows[0];
         if (!t) throw new BadRequestException('Convite inválido ou expirado. Peça um novo à presidência.');
-        const a = (await c.query('select id, nome, email from associado where id=$1 for update', [t.associado_id])).rows[0];
-        await c.query("insert into usuario(associado_id, nome, email, senha_hash, perfil, ativo, telefone, email_verificado_em) values($1,$2,$3,$4,$5,true,$6,now())",
-          [a.id, a.nome, a.email, hash, t.dados?.perfil ?? 'associado', telefone ?? null]);
-        await c.query("update associado set situacao='ativo', telefone=coalesce($2, telefone) where id=$1", [a.id, telefone ?? null]);
+        if (t.usuario_id) {
+          const r = await c.query("update usuario set senha_hash=$2, ativo=true, telefone=coalesce($3, telefone), email_verificado_em=now(), senha_alterada_em=now() where id=$1 and senha_hash='pendente'", [t.usuario_id, hash, telefone ?? null]);
+          if (!r.rowCount) throw new BadRequestException('Este convite já foi usado.');
+        } else {
+          const a = (await c.query('select id, nome, email from associado where id=$1 for update', [t.associado_id])).rows[0];
+          await c.query("insert into usuario(associado_id, nome, email, senha_hash, perfil, ativo, telefone, email_verificado_em) values($1,$2,$3,$4,$5,true,$6,now())",
+            [a.id, a.nome, a.email, hash, t.dados?.perfil ?? 'associado', telefone ?? null]);
+          await c.query("update associado set situacao='ativo', telefone=coalesce($2, telefone) where id=$1", [a.id, telefone ?? null]);
+        }
         await c.query('update token_usuario set usado_em=now() where id=$1', [t.id]);
       });
     } catch (e) { tratarUnico(e, 'Já existe uma conta com este e-mail.'); }

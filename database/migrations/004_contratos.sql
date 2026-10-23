@@ -1,0 +1,23 @@
+-- Etapa 3 (contratos). Seguro para rodar mais de uma vez.
+CREATE EXTENSION IF NOT EXISTS btree_gist;
+ALTER TABLE contrato ADD COLUMN IF NOT EXISTS valor_por_dia numeric(12,2) NOT NULL DEFAULT 0;
+ALTER TABLE contrato ADD COLUMN IF NOT EXISTS status text NOT NULL DEFAULT 'vigente';
+ALTER TABLE contrato ADD COLUMN IF NOT EXISTS pdf_nome text;
+ALTER TABLE contrato ADD COLUMN IF NOT EXISTS criado_por int REFERENCES usuario;
+ALTER TABLE contrato ADD COLUMN IF NOT EXISTS criado_em timestamptz NOT NULL DEFAULT now();
+ALTER TABLE contrato DROP CONSTRAINT IF EXISTS contrato_status_check;
+ALTER TABLE contrato ADD CONSTRAINT contrato_status_check CHECK (status IN ('vigente','encerrado'));
+ALTER TABLE contrato DROP CONSTRAINT IF EXISTS contrato_dias_check;
+ALTER TABLE contrato ADD CONSTRAINT contrato_dias_check CHECK (cardinality(dias_semana) >= 1 AND dias_semana <@ ARRAY[1,2,3,4,5]::smallint[]);
+ALTER TABLE contrato DROP CONSTRAINT IF EXISTS contrato_sem_sobreposicao;
+ALTER TABLE contrato ADD CONSTRAINT contrato_sem_sobreposicao EXCLUDE USING gist (associado_id WITH =, daterange(inicio, fim, '[]') WITH &&) WHERE (status = 'vigente');
+ALTER TABLE aditivo ADD COLUMN IF NOT EXISTS vigencia_a_partir date;
+UPDATE aditivo SET vigencia_a_partir = criado_em::date WHERE vigencia_a_partir IS NULL;
+ALTER TABLE aditivo ALTER COLUMN vigencia_a_partir SET NOT NULL;
+ALTER TABLE aditivo ADD COLUMN IF NOT EXISTS novo_valor_por_dia numeric(12,2);
+ALTER TABLE aditivo ADD COLUMN IF NOT EXISTS observacao text;
+ALTER TABLE aditivo ADD COLUMN IF NOT EXISTS criado_por int REFERENCES usuario;
+ALTER TABLE aditivo ADD COLUMN IF NOT EXISTS solicitacao_id int REFERENCES solicitacao;
+INSERT INTO parametro(chave, valor) VALUES ('alerta_renovacao_dias', '30') ON CONFLICT DO NOTHING;
+CREATE INDEX IF NOT EXISTS contrato_associado ON contrato (associado_id);
+CREATE INDEX IF NOT EXISTS aditivo_contrato ON aditivo (contrato_id);

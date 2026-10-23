@@ -6,7 +6,7 @@ export interface Solicitacao {
   dados: { nome: string; email: string; telefone: string | null; instituicaoId: number };
 }
 export interface UsuarioAdm { id: number; nome: string; email: string; perfil: Perfil; ativo: boolean; ultimoAcesso: string | null; emailVerificado: boolean; cargo: string | null }
-export interface Parametros { valorPorDia: number; multaPercentual: number }
+export interface Parametros { valorPorDia: number; multaPercentual: number; alertaRenovacaoDias: number }
 export interface RegistroAuditoria { id: number; em: string; acao: string; entidade: string | null; detalhes: Record<string, unknown> | null; usuario: string | null }
 export interface PaginaAuditoria { itens: RegistroAuditoria[]; total: number; pagina: number; porPagina: number }
 export interface FiltroAuditoria { acao?: string; de?: string; ate?: string; pagina?: number }

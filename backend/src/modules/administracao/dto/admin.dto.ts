@@ -9,7 +9,9 @@ export class AtualizarUsuarioDto {
 export class ParametrosDto {
   @IsNumber({ maxDecimalPlaces: 2 }, { message: 'Informe o valor com até 2 casas decimais.' }) @Min(0, { message: 'O valor não pode ser negativo.' }) @Max(100000) valorPorDia!: number;
   @IsNumber({ maxDecimalPlaces: 2 }, { message: 'Informe a multa com até 2 casas decimais.' }) @Min(0, { message: 'A multa não pode ser negativa.' }) @Max(100, { message: 'A multa não pode passar de 100%.' }) multaPercentual!: number;
+  @Type(() => Number) @IsInt({ message: 'Informe os dias de antecedência do alerta.' }) @Min(1, { message: 'O alerta precisa ser de ao menos 1 dia.' }) @Max(365) alertaRenovacaoDias!: number;
 }
+export class AlertaDto {}
 export class AuditoriaQueryDto {
   @IsOptional() @IsString() @MaxLength(60) acao?: string;
   @IsOptional() @Type(() => Number) @IsInt() usuarioId?: number;

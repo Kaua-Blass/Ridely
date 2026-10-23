@@ -1,2 +1,1 @@
-// TODO: tipos da tela Veículos e rotas.
-export {};
+export type { Visao, RotaAdm, VeiculoAdm, InstituicaoAdm, MotoristaAdm } from './api';

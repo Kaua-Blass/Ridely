@@ -9,7 +9,7 @@ export const ACESSO: Record<Perfil, string[]> = {
   'vice-presidente': todas.filter((t) => t !== 'administracao'),
   tesoureiro: ['painel', 'associados', 'veiculos-rotas', 'financeiro', 'controles-financeiros', 'contratos', 'comunicacao', 'relatorios', 'perfil'],
   conselheiro: ['painel', 'associados', 'veiculos-rotas', 'financeiro', 'controles-financeiros', 'contratos', 'comunicacao', 'relatorios', 'perfil'],
-  auxiliar: ['painel', 'associados', 'veiculos-rotas', 'transporte', 'comunicacao', 'perfil'],
+  auxiliar: ['painel', 'associados', 'veiculos-rotas', 'contratos', 'transporte', 'comunicacao', 'perfil'],
   associado: ['painel', 'financeiro', 'contratos', 'transporte', 'comunicacao', 'perfil'],
   motorista: ['painel', 'transporte', 'veiculos-rotas', 'perfil'],
 };
@@ -20,7 +20,7 @@ export const ESCRITA: Record<string, Perfil[]> = {
   'veiculos-rotas': ['presidente', 'vice-presidente'],
   financeiro: ['presidente', 'tesoureiro'],
   'controles-financeiros': ['presidente', 'tesoureiro'],
-  contratos: ['presidente', 'vice-presidente'],
+  contratos: ['presidente', 'vice-presidente', 'auxiliar'],
   comunicacao: ['presidente', 'vice-presidente', 'tesoureiro'],
   administracao: ['presidente'],
 };

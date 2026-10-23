@@ -1,5 +1,8 @@
 import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
-import { Pool, PoolClient, QueryResultRow } from 'pg';
+import { Pool, PoolClient, QueryResultRow, types } from 'pg';
+
+// colunas `date` chegam como texto 'AAAA-MM-DD' (sem fuso), nunca como Date
+types.setTypeParser(1082, (v: string) => v);
 
 @Injectable()
 export class DbService implements OnModuleDestroy {

@@ -1,2 +1,1 @@
-// TODO: tipos da tela Financeiro.
-export {};
+export type { MensalidadeItem, StatusMens, Resumo } from './api';

@@ -13,7 +13,7 @@ export class AdministracaoService {
     return this.db.query(`
       select s.id, s.tipo, s.dados, s.criado_em as "criadoEm", (u.email_verificado_em is not null) as "emailVerificado"
       from solicitacao s left join usuario u on u.id = s.usuario_id
-      where s.status = 'pendente' order by s.criado_em`);
+      where s.status = 'pendente' and s.tipo = 'associacao' order by s.criado_em`);
   }
 
   // ---------- usuários e perfis ----------
@@ -45,17 +45,17 @@ export class AdministracaoService {
   async parametros() {
     const l = await this.db.query('select chave, valor from parametro');
     const m = Object.fromEntries(l.map((p) => [p.chave, Number(p.valor)]));
-    return { valorPorDia: m.valor_por_dia ?? 0, multaPercentual: m.multa_percentual ?? 0 };
+    return { valorPorDia: m.valor_por_dia ?? 0, multaPercentual: m.multa_percentual ?? 0, alertaRenovacaoDias: m.alerta_renovacao_dias ?? 30 };
   }
   async salvarParametros(d: ParametrosDto, quemId: number) {
     const antes = await this.parametros();
     await this.db.tx(async (c) => {
-      for (const [k, v] of [['valor_por_dia', d.valorPorDia.toFixed(2)], ['multa_percentual', String(d.multaPercentual)]]) {
+      for (const [k, v] of [['valor_por_dia', d.valorPorDia.toFixed(2)], ['multa_percentual', String(d.multaPercentual)], ['alerta_renovacao_dias', String(d.alertaRenovacaoDias)]]) {
         await c.query('insert into parametro(chave, valor) values($1,$2) on conflict (chave) do update set valor = excluded.valor', [k, v]);
       }
     });
     await this.db.auditar(quemId, 'parametros_alterados', 'parametro', { antes, depois: d });
-    return { mensagem: 'Parâmetros salvos. Valem para as próximas mensalidades.' };
+    return { mensagem: 'Parâmetros salvos. O valor por dia vale para novos contratos; contratos existentes mantêm o valor deles.' };
   }
 
   // ---------- auditoria ----------

@@ -1,5 +1,6 @@
 -- TCC · esquema inicial (PostgreSQL 15+). Valores em reais: numeric(12,2).
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
+CREATE EXTENSION IF NOT EXISTS btree_gist;
 
 CREATE TYPE perfil_acesso AS ENUM ('presidente','vice_presidente','tesoureiro','conselheiro','auxiliar','associado','motorista');
 CREATE TYPE cargo_assoc AS ENUM ('associado','presidente','vice_presidente','tesoureiro','conselheiro','auxiliar');
@@ -38,7 +39,7 @@ CREATE TABLE solicitacao (
   dados jsonb NOT NULL, status text NOT NULL DEFAULT 'pendente' CHECK (status IN ('pendente','aprovada','rejeitada')),
   usuario_id int REFERENCES usuario, decidido_por int REFERENCES usuario, criado_em timestamptz NOT NULL DEFAULT now());
 CREATE TABLE parametro (chave text PRIMARY KEY, valor text NOT NULL);
-INSERT INTO parametro VALUES ('valor_por_dia','50.00'), ('multa_percentual','5');
+INSERT INTO parametro VALUES ('valor_por_dia','50.00'), ('multa_percentual','5'), ('alerta_renovacao_dias','30');
 
 -- veículos e contratos
 CREATE TABLE veiculo (
@@ -47,29 +48,42 @@ CREATE TABLE veiculo (
   motorista_usuario_id int REFERENCES usuario);
 CREATE TABLE contrato (
   id serial PRIMARY KEY, associado_id int NOT NULL REFERENCES associado,
-  inicio date NOT NULL, fim date NOT NULL, dias_semana smallint[] NOT NULL, pdf_path text, CHECK (fim >= inicio));
+  inicio date NOT NULL, fim date NOT NULL, dias_semana smallint[] NOT NULL, valor_por_dia numeric(12,2) NOT NULL DEFAULT 0,
+  status text NOT NULL DEFAULT 'vigente' CHECK (status IN ('vigente','encerrado')),
+  pdf_path text, pdf_nome text, criado_por int REFERENCES usuario, criado_em timestamptz NOT NULL DEFAULT now(),
+  CHECK (fim >= inicio),
+  CONSTRAINT contrato_dias_check CHECK (cardinality(dias_semana) >= 1 AND dias_semana <@ ARRAY[1,2,3,4,5]::smallint[]),
+  CONSTRAINT contrato_sem_sobreposicao EXCLUDE USING gist (associado_id WITH =, daterange(inicio, fim, '[]') WITH &&));
 CREATE TABLE aditivo (
   id serial PRIMARY KEY, contrato_id int NOT NULL REFERENCES contrato,
-  novo_fim date, novos_dias smallint[], criado_em timestamptz NOT NULL DEFAULT now());
+  vigencia_a_partir date NOT NULL, novo_fim date, novos_dias smallint[], novo_valor_por_dia numeric(12,2), observacao text,
+  criado_por int REFERENCES usuario, solicitacao_id int REFERENCES solicitacao, criado_em timestamptz NOT NULL DEFAULT now());
 
 -- financeiro (regime de caixa)
 CREATE TABLE conta_financeira (
   id serial PRIMARY KEY, nome text NOT NULL, tipo text NOT NULL CHECK (tipo IN ('caixa','banco')),
   banco text, agencia text, numero text, digito text, tipo_conta text, chave_pix text, titular text, observacoes text,
-  saldo_inicial numeric(12,2) NOT NULL DEFAULT 0, ativa boolean NOT NULL DEFAULT true);
+  saldo_inicial numeric(12,2) NOT NULL DEFAULT 0 CHECK (saldo_inicial >= 0), ativa boolean NOT NULL DEFAULT true);
 CREATE TABLE mensalidade (
   id serial PRIMARY KEY, associado_id int NOT NULL REFERENCES associado, contrato_id int REFERENCES contrato,
-  referencia char(7) NOT NULL, vencimento date NOT NULL, valor numeric(12,2) NOT NULL,
-  UNIQUE (associado_id, referencia));
+  referencia char(7) NOT NULL, vencimento date NOT NULL, valor numeric(12,2) NOT NULL CHECK (valor >= 0),
+  cancelada_em timestamptz, cancelada_motivo text, criado_por int REFERENCES usuario, criado_em timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (associado_id, referencia),
+  CONSTRAINT mensalidade_referencia_check CHECK (referencia ~ '^[0-9]{4}-(0[1-9]|1[0-2])$'));
 CREATE TABLE pagamento (
-  id serial PRIMARY KEY, mensalidade_id int NOT NULL UNIQUE REFERENCES mensalidade,
-  pago_em date NOT NULL, valor numeric(12,2) NOT NULL, multa numeric(12,2) NOT NULL DEFAULT 0,
-  forma text NOT NULL, conta_id int NOT NULL REFERENCES conta_financeira);
+  id serial PRIMARY KEY, mensalidade_id int NOT NULL REFERENCES mensalidade,
+  pago_em date NOT NULL, valor numeric(12,2) NOT NULL CHECK (valor > 0), multa numeric(12,2) NOT NULL DEFAULT 0 CHECK (multa >= 0),
+  forma text NOT NULL CHECK (forma IN ('dinheiro','pix','transferencia','cartao')), conta_id int NOT NULL REFERENCES conta_financeira,
+  observacao text, criado_por int REFERENCES usuario, criado_em timestamptz NOT NULL DEFAULT now(),
+  estornado_em timestamptz, estorno_motivo text, estornado_por int REFERENCES usuario);
 CREATE TABLE movimentacao (
   id serial PRIMARY KEY, conta_id int NOT NULL REFERENCES conta_financeira, data date NOT NULL,
   tipo tipo_mov NOT NULL, categoria text, historico text, valor numeric(12,2) NOT NULL CHECK (valor > 0),
   pagamento_id int REFERENCES pagamento, transferencia_id uuid,
-  criado_por int REFERENCES usuario, criado_em timestamptz NOT NULL DEFAULT now());
+  sinal smallint NOT NULL CHECK (sinal IN (1, -1)), associado_id int REFERENCES associado, estorna_id int REFERENCES movimentacao, observacao text,
+  criado_por int REFERENCES usuario, criado_em timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT movimentacao_sinal_tipo_check CHECK ((tipo IN ('receita','transferencia_entrada') AND sinal = 1) OR (tipo IN ('despesa','transferencia_saida') AND sinal = -1) OR tipo = 'estorno'),
+  CONSTRAINT movimentacao_estorno_check CHECK ((tipo = 'estorno') = (estorna_id IS NOT NULL)));
 
 -- transporte
 CREATE TABLE viagem (
@@ -100,3 +114,13 @@ ALTER TABLE usuario ADD CONSTRAINT usuario_email_minusculo CHECK (email = lower(
 ALTER TABLE associado ADD CONSTRAINT associado_email_minusculo CHECK (email IS NULL OR email = lower(email));
 CREATE INDEX token_usuario_hash ON token_usuario (token_hash);
 CREATE INDEX auditoria_em ON auditoria (em DESC);
+CREATE UNIQUE INDEX veiculo_motorista_unico ON veiculo (motorista_usuario_id) WHERE motorista_usuario_id IS NOT NULL;
+CREATE INDEX contrato_associado ON contrato (associado_id);
+CREATE INDEX aditivo_contrato ON aditivo (contrato_id);
+
+-- financeiro: um pagamento ativo por mensalidade, um estorno por movimentação, nome de conta único
+CREATE UNIQUE INDEX pagamento_mensalidade_ativo ON pagamento (mensalidade_id) WHERE estornado_em IS NULL;
+CREATE UNIQUE INDEX movimentacao_estorno_unico ON movimentacao (estorna_id) WHERE estorna_id IS NOT NULL;
+CREATE UNIQUE INDEX conta_nome_unico ON conta_financeira (lower(nome));
+CREATE INDEX movimentacao_conta_data ON movimentacao (conta_id, data, id);
+CREATE INDEX mensalidade_referencia ON mensalidade (referencia);

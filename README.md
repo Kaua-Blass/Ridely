@@ -94,6 +94,56 @@ Regra de quem pode o quê em Associados: o vice edita e inativa só associados c
 
 Endpoints novos: `GET/PATCH /api/perfil`, `POST /api/perfil/senha`, `/email`, `/foto` (+ `GET`/`DELETE`), `PATCH /api/associados/:id`, `POST /api/associados/:id/situacao`, `GET /api/veiculos-rotas/rotas`, e em `/api/administracao`: `usuarios`, `parametros`, `auditoria`, `auditoria/acoes`.
 
+## Veículos e rotas (etapa 2)
+
+| Recurso | Como funciona |
+|---|---|
+| Veículos | incluir, alterar e remover; placa validada (ABC1D23 ou ABC-1234) e única; capacidade de 1 a 60; um motorista por veículo |
+| Rotas | nome, descrição, paradas em ordem (com ↑ ↓) e instituições atendidas |
+| Instituições | incluir, alterar e remover; não remove se há associados ou rotas ligados |
+| Motoristas | convite por e-mail; a pessoa cria a senha pelo link; perfil `motorista` (não é associado) |
+
+Regras de consistência:
+- Mudar uma rota ajusta os associados afetados: se a instituição saiu da rota, ele vai para outra rota que atenda a instituição (ou fica sem rota); se o ponto de embarque deixou de existir, o ponto é limpo. A tela avisa quantos foram ajustados.
+- Remover rota só é possível sem veículos, sem associados e sem viagens registradas.
+- Reduzir a capacidade, mover ou remover um veículo é recusado se, em dias futuros, as reservas passariam da capacidade restante da rota.
+- Só presidente e vice alteram; tesoureiro, conselheiro, auxiliar e motorista consultam.
+
+## Contratos (etapa 3)
+
+| Recurso | Como funciona |
+|---|---|
+| Contrato | associado ativo, início, término, dias de transporte (segunda a sexta) e valor por dia; o valor padrão vem dos parâmetros e fica gravado no contrato |
+| Sobreposição | um associado não pode ter dois contratos vigentes no mesmo período (regra no banco) |
+| Aditivo | muda dias, valor por dia e/ou término **a partir de uma data** (hoje ou depois); fica no histórico com quem registrou |
+| Correção direta | só enquanto o contrato não tem aditivos nem mensalidades; depois, só por aditivo |
+| Encerrar | define a data de encerramento (hoje ou depois) |
+| PDF | só PDF de verdade (conferido pelo conteúdo), até 10 MB; baixado como anexo; o associado anexa o dele só se ainda não houver |
+| Solicitação | o associado pede mudança de dias; nada muda até presidente, vice ou auxiliar aprovar (aprovar cria o aditivo); o associado é avisado por e-mail |
+| Alerta de renovação | faixa na tela e situação "A renovar" quando faltam até N dias (parâmetro, padrão 30); "Vencido" depois do término; botão Prorrogar |
+
+**Mensalidade proporcional.** Cada dia do mês em que o contrato está em vigor vale (dias por semana × valor por dia) ÷ dias do mês, usando a versão do contrato daquele dia. Mês inteiro e sem mudança: dias × valor por dia (5 dias × R$ 50 = R$ 250). Exemplos: contrato que começa no dia 16 de um mês de 30 dias paga 15/30; aditivo no dia 11 trocando 5 por 3 dias paga 10/30 de R$ 250 + 20/30 de R$ 150 = R$ 183,33. O cálculo está em `backend/src/modules/contratos/calculo.ts` e é testado com `npm test` (sem banco). A etapa 4 usa a mesma função para gerar as mensalidades.
+
+Quem pode: presidente, vice e auxiliar alteram; tesoureiro e conselheiro consultam; o associado vê só os próprios contratos.
+
+## Financeiro e contas (etapa 4)
+
+| Recurso | Como funciona |
+|---|---|
+| Gerar mensalidades | para quem tem contrato no mês; vencimento **sempre dia 10**; valor proporcional ao contrato (soma de todos os contratos do mês); não duplica; mês de 2020 até 12 meses à frente |
+| Mudança de contrato | aditivo, encerramento ou solicitação aprovada refazem o valor das mensalidades **em aberto** do mês atual em diante; paga não muda; mês sem valor vira "cancelada" e volta se o contrato voltar |
+| Baixa | uma transação grava o pagamento e a receita na conta; multa única de 5% sem juros se pago depois do dia 10 (pode ser dispensada com motivo); só uma baixa ativa por mensalidade |
+| Recibo | PDF numerado pelo pagamento; o associado baixa só os dele; recibo estornado sai marcado |
+| Estorno de baixa | a mensalidade volta para "em aberto" e entra uma saída na conta; recusa se faltar saldo |
+| Contas | caixa ou banco (banco, agência, conta, dígito, tipo, Pix, titular); saldo = saldo inicial + movimentações; saldo inicial fixo depois de criada |
+| Inativar / remover | inativar só com saldo zerado; conta com qualquer movimentação nunca é removida |
+| Receita / despesa | categorias fixas; despesa sem saldo é recusada; mensalidade só entra pela baixa; não aceita data futura |
+| Transferência | saída e entrada gravadas juntas, travando as duas contas sempre na mesma ordem; recusa sem saldo na origem; não conta como receita nem despesa |
+| Estorno de movimentação | entra um lançamento oposto (nada é alterado); transferência é estornada nas duas pontas; um estorno por movimentação |
+| Consulta | filtros por conta, tipo, período e texto; saldo da conta após cada movimentação; totais de receitas e despesas sem transferências |
+
+Quem pode: presidente e tesoureiro movimentam; vice e conselheiro consultam; o associado vê só as próprias mensalidades e recibos. Os registros de movimentação são imutáveis no banco.
+
 ## Atualizar um banco que já existe
 
 Quem já tinha subido o banco aplica as migrações da pasta `database/migrations` em ordem (veja o README de lá).
@@ -110,7 +160,6 @@ Quem já tinha subido o banco aplica as migrações da pasta `database/migration
 
 ## Próximos passos
 
-1. Veículos e rotas: incluir, alterar e remover (inclui motoristas com acesso).
-2. Contratos, depois Financeiro e Contas (baixas em transação).
-3. Transporte, comunicação, painel e relatórios.
-4. Testes automáticos e preparação para o servidor próprio.
+1. Transporte (viagens, reservas, lista de passageiros, alerta de lotação), comunicação, painel e relatórios.
+2. Comunicação (cobranças e lembretes por e-mail), relatórios de inadimplência e fluxo de caixa.
+3. Testes automáticos e preparação para o servidor próprio.

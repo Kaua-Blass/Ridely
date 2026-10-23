@@ -1,2 +1,1 @@
-// TODO: tipos da tela Contratos.
-export {};
+export type { ContratoItem, ContratoDetalhe, Solicitacao, Situacao } from './api';

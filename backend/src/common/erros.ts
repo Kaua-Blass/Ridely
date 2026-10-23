@@ -14,3 +14,11 @@ export class ArquivoGrandeFilter implements ExceptionFilter {
     host.switchToHttp().getResponse<Response>().status(413).json({ message: 'A imagem deve ter até 2 MB.', error: 'Payload Too Large', statusCode: 413 });
   }
 }
+
+/** Mensagem em português para PDF grande demais. */
+@Catch(PayloadTooLargeException)
+export class PdfGrandeFilter implements ExceptionFilter {
+  catch(_: PayloadTooLargeException, host: ArgumentsHost) {
+    host.switchToHttp().getResponse<Response>().status(413).json({ message: 'O PDF deve ter até 10 MB.', error: 'Payload Too Large', statusCode: 413 });
+  }
+}
