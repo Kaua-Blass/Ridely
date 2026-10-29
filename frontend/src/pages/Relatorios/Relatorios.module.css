@@ -1,0 +1,9 @@
+.titulo { font-size: 1.45rem; margin: 0; }
+.sub { color: var(--texto-suave); margin: 0 0 18px; }
+.cabecalho { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 8px; }
+.cabecalho h2 { margin: 0; }
+.exportar { display: flex; gap: 8px; flex-wrap: wrap; }
+.periodo { display: flex; gap: 14px; flex-wrap: wrap; margin-bottom: 6px; }
+.periodo label { display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--texto-suave); }
+.periodo input { width: auto; }
+table td, table th { font-size: 14px; }

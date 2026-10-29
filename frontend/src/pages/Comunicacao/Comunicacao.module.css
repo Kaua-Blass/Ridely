@@ -1,0 +1,26 @@
+.titulo { font-size: 1.45rem; margin: 0; }
+.sub { color: var(--texto-suave); margin: 0 0 18px; }
+
+/* ---- Etapa 6: comunicados, notificações e rotinas ---- */
+.topo { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
+.topo h2 { margin: 0; }
+textarea { width: 100%; font: inherit; color: var(--texto); background: var(--fundo); border: 1px solid var(--linha); border-radius: 9px; padding: 8px 10px; min-height: 110px; resize: vertical; }
+.acoes { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
+.item { border-bottom: 1px solid var(--linha); padding: 14px 0; }
+.item:last-child { border-bottom: 0; }
+.item h3 { margin: 6px 0 4px; font-size: 16px; }
+.meta { color: var(--texto-suave); font-size: 13px; display: flex; gap: 6px 14px; flex-wrap: wrap; align-items: center; }
+.mensagem { white-space: pre-wrap; margin: 8px 0; overflow-wrap: anywhere; }
+.anexo { display: inline-block; margin: 2px 0 6px; font-weight: 600; }
+.entregas { font-size: 13px; color: var(--texto-suave); }
+.falha { color: var(--erro); font-weight: 600; }
+.tag.cob { color: var(--erro); }
+.notif { display: block; width: 100%; text-align: left; font: inherit; color: var(--texto); background: none; border: 0; border-bottom: 1px solid var(--linha); padding: 12px 8px 12px 14px; cursor: pointer; border-left: 4px solid transparent; }
+.notif:hover { background: var(--fundo); }
+.notif.nova { border-left-color: var(--primaria); background: var(--fundo); }
+.notif.nova b { color: var(--primaria); }
+.notif span { display: block; color: var(--texto-suave); font-size: 14px; margin-top: 2px; }
+.notif small { color: var(--texto-suave); }
+.paginacao { display: flex; gap: 10px; align-items: center; justify-content: center; margin-top: 14px; }
+.aviso { background: var(--fundo); border: 1px solid var(--alerta); color: var(--texto); border-radius: 9px; padding: 10px 12px; margin-bottom: 14px; }
+.vazio { color: var(--texto-suave); padding: 18px 0; text-align: center; }

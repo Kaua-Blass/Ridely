@@ -1,0 +1,7 @@
+.titulo { font-size: 1.45rem; margin: 0; }
+.sub { color: var(--texto-suave); margin: 0 0 18px; }
+.grade { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; }
+.indicador { display: flex; flex-direction: column; gap: 6px; margin: 0; }
+.rotulo { color: var(--texto-suave); font-size: 13px; }
+.valor { font-size: 1.5rem; color: var(--primaria); }
+.detalhe { color: var(--texto-suave); font-size: 13px; }

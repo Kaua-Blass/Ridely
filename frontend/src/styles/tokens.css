@@ -1,0 +1,13 @@
+:root {
+  --fundo: #ffffff;
+  --painel: #eef4ff;
+  --painel-forte: #1f4fb8;
+  --primaria: #1f5fd6;
+  --texto: #0f2442;
+  --texto-suave: #62758f;
+  --linha: #d3e2fa;
+  --ok: #1b7a52;
+  --alerta: #9a6200;
+  --erro: #b3302f;
+  --raio: 14px;
+}
