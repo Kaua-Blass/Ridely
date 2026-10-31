@@ -55,89 +55,6 @@ Uma pasta por tela nos dois lados: `pages/Associados` conversa com `modules/asso
    npm run dev                 # http://localhost:5173
    ```
 
-## Configuração e HTTPS
-
-A API só sobe com a configuração válida: `JWT_SECRET`, `CPF_CHAVE` e `DATABASE_URL` obrigatórias. Em produção (`NODE_ENV=production`), o `APP_URL` precisa começar com `https://`, e o `JWT_SECRET` precisa ter pelo menos 32 caracteres. Se algo estiver errado, o servidor não sobe e mostra o que corrigir.
-
-| Variável | Para que serve |
-|---|---|
-| `APP_URL` | endereço público do sistema; com `https://`, o cookie de sessão sai marcado como `Secure` |
-| `COOKIE_SEGURO` | força `true` ou `false` no cookie, sem depender do `APP_URL` |
-| `PERMITIR_HTTP` | `true` libera `APP_URL` em `http://` em produção (só para teste local) |
-| `TRUST_PROXY` | atrás de um proxy reverso (nginx, Caddy), número de proxies confiáveis (ex.: `1`), para o limite de tentativas usar o IP real do cliente |
-| `TLS_CERT_FILE` e `TLS_KEY_FILE` | HTTPS direto, sem proxy: caminhos dos arquivos PEM do certificado e da chave |
-| `PORT` | porta da API (padrão 3000) |
-
-Em produção, o recomendado é um proxy reverso com certificado (Caddy ou nginx com Let's Encrypt) na frente da API, com `TRUST_PROXY=1` e `APP_URL=https://...`. A alternativa é usar `TLS_CERT_FILE` e `TLS_KEY_FILE` diretamente. O cookie de sessão tem `HttpOnly`, `SameSite=Lax` e, com HTTPS, `Secure`. As respostas trazem o cabeçalho HSTS e os demais cabeçalhos de segurança do `helmet`.
-
-## Proteção do CPF
-
-O CPF não fica em texto no banco. Cada CPF é guardado cifrado com AES-256-GCM, usando a chave `CPF_CHAVE`, e uma impressão digital (HMAC-SHA256) é usada só para impedir CPFs repetidos. A API nunca devolve o CPF: as listagens e os detalhes não o incluem. O pedido de cadastro público também não guarda o CPF em texto.
-
-Para bancos que já existiam com o CPF em texto, depois de aplicar a migração `008` rode, no backend:
-
-```
-npm run cpf:migrar            # desenvolvimento
-npm run build && npm run cpf:migrar:producao   # produção (código compilado)
-```
-
-O comando cifra os CPFs existentes e remove a coluna em texto, tudo numa única transação: se falhar, nada muda. Pode ser executado de novo sem efeito.
-
-Atenção: se a `CPF_CHAVE` for perdida, os CPFs cifrados não podem ser recuperados. Guarde a chave em um cofre de senhas ou em um gerenciador de segredos, separada do banco.
-
-## Backup e restauração
-
-O backup tem duas partes: o banco (formato do `pg_dump`, comprimido) e a pasta de uploads (fotos, PDFs de contratos e anexos de comunicados). Cada execução gera também um arquivo de checksums, e os backups mais antigos que o prazo de retenção são apagados.
-
-Pré-requisito: as ferramentas `pg_dump` e `pg_restore` (as mesmas do PostgreSQL 16) e `bash`. No Windows, use o Git Bash ou o WSL.
-
-Para gerar um backup, a partir da pasta `backend`:
-
-```
-DATABASE_URL=postgresql://ridely:SENHA@localhost:5432/ridely UPLOAD_DIR=./uploads BACKUP_DIR=./backups bash scripts/backup.sh
-```
-
-Variáveis: `BACKUP_RETENCAO_DIAS` (padrão 14) define por quantos dias os backups são mantidos.
-
-Para agendar todo dia às 3 h, em Linux, adicione ao crontab (`crontab -e`):
-
-```
-0 3 * * * cd /opt/ridely/backend && DATABASE_URL=postgresql://... UPLOAD_DIR=/opt/ridely/backend/uploads BACKUP_DIR=/var/backups/ridely bash scripts/backup.sh >> /var/log/ridely-backup.log 2>&1
-```
-
-No Windows, use o Agendador de Tarefas chamando o `bash` do Git Bash com o mesmo comando.
-
-Para restaurar, **substitui os dados do banco de destino** e por isso exige confirmação explícita:
-
-```
-CONFIRMAR_RESTAURACAO=sim DATABASE_URL=postgresql://... UPLOAD_DIR=./uploads bash scripts/restaura.sh ./backups/ridely-AAAAMMDD-HHMMSS.dump
-```
-
-Antes de restaurar, o script confere os checksums e recusa o arquivo se ele tiver sido alterado. Depois da restauração, confira o sistema e use a mesma `CPF_CHAVE` com que os dados foram gravados.
-
-Duas recomendações. Guarde uma cópia dos backups fora do servidor, porque um backup no mesmo disco não protege contra a perda do servidor. E teste a restauração de tempos em tempos: um backup que nunca foi restaurado não é garantia de nada.
-
-Atenção: o backup do banco contém os CPFs cifrados. Sem a `CPF_CHAVE`, eles não podem ser lidos. Guarde a chave separada dos backups.
-
-## E-mails
-
-- **Sem `SMTP_URL`** (padrão): nada é enviado; cada e-mail aparece no terminal do back-end, com o link. Dá para testar tudo assim.
-- **Com Gmail**: ative a verificação em duas etapas, crie uma *senha de app* em https://myaccount.google.com/apppasswords e use
-  `SMTP_URL=smtps://seu-email%40gmail.com:SENHA_DE_APP@smtp.gmail.com:465` (o `@` do e-mail vira `%40`).
-  Serviços como Brevo e Resend também funcionam por SMTP.
-- Em produção, defina `APP_URL` com o endereço público do site (os links dos e-mails usam esse endereço).
-
-## Fluxos prontos
-
-| Fluxo | Como funciona |
-|---|---|
-| Login | e-mail e senha; cookie `httpOnly`; máximo de 8 tentativas por 15 min; resposta igual para e-mail inexistente |
-| Esqueci a senha | pede o e-mail, recebe um link (vale 30 min, uso único); a nova senha encerra as sessões antigas |
-| Cadastro público | cria conta **inativa** + pedido para a presidência + e-mail de confirmação; a presidência aprova em Administração |
-| Convite | presidente ou vice convida por e-mail (cargo, perfil e instituição); a pessoa cria a própria senha pelo link (vale 7 dias) |
-
-Tokens de e-mail (confirmação, convite, recuperação) são aleatórios, guardados só como hash e de uso único. Senhas usam scrypt.
-
 ## Endpoints
 
 | Método e rota | Quem acessa |
@@ -296,20 +213,8 @@ DATABASE_URL=postgres://ridely:ridely@localhost:5432/ridely_test npm run test:in
 
 Quem já tinha subido o banco aplica as migrações da pasta `database/migrations` em ordem (veja o README de lá). A migração `008` exige, depois, o comando `npm run cpf:migrar`.
 
-## Regras já decididas
-
-- Associado é o mesmo que estudante (1 para 1); o convite sugere o perfil pelo cargo e o presidente ajusta.
-- Mensalidade = dias contratados × valor por dia. Atraso: multa de 5%, sem juros.
-- Regime de caixa, sem plano de contas: só contas de caixa e banco. Saída sem saldo é recusada.
-- Conta com movimentação não é removida; só inativada, com saldo zerado.
-- Rota escolhida pela instituição e pelo ponto de embarque. Lotação gera alerta.
-- Movimentações e auditoria são imutáveis (gatilhos no banco); correção por estorno.
-- Notificações por painel e e-mail. Assinatura via gov.br fica para depois.
-
 ## Próximos passos
 
-1. Testes automatizados de Financeiro, Transporte, Contratos, Associados e Veículos (hoje só o cálculo de mensalidade e as etapas 6 e 7 têm testes de integração).
-2. Teste de interface das telas de Financeiro, Transporte e Contratos, na pasta `e2e`.
-3. Implantação: monitoramento, cópia dos backups para fora do servidor e preparação para o servidor próprio.
-4. Conformidade com a LGPD: base legal, política de retenção e aviso de privacidade.
-5. Limitador de tentativas de login em memória: com mais de um servidor, precisa de armazenamento compartilhado.
+- Hospedar, no momento rodando só localmente
+
+- Serviço para subir funcionalidade dos e-mails
